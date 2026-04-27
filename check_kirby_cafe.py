@@ -269,6 +269,13 @@ async def try_click_month(page, month_num, results, silent=False):
     return None
 
 
+def slot_sort_key(slot: str) -> tuple:
+    m = re.match(r'(\d+)/(\d+)[（(][月火水木金土日][）)](\d+):(\d+)', slot)
+    if not m:
+        return (0, 0, 0, 0)
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)))
+
+
 async def check_calendar(page, label, results, date_str):
     """現在表示中のカレンダーの空き状況を取得して結果に追記する"""
     await page.wait_for_timeout(2000)
@@ -276,7 +283,7 @@ async def check_calendar(page, label, results, date_str):
     year = data.get("year")
     month = data.get("month")
     month_label = f"{year}年{month}月" if year and month else label
-    slots = data.get("available", [])
+    slots = sorted(data.get("available", []), key=slot_sort_key)
 
     # スクロール可能な内部コンテナのoverflow制限を解除してから撮影
     await page.evaluate("""
@@ -297,14 +304,15 @@ async def check_calendar(page, label, results, date_str):
     screenshot_path = os.path.join(OUTPUT_DIR, f"{date_str}_kirby_{label}.png")
     await page.screenshot(path=screenshot_path, full_page=True)
 
+    lines = []
     if slots:
-        results.append(f"【空きあり】{month_label}: {len(slots)} 件")
-        results.append("  " + ", ".join(slots[:30]))
+        lines.append(f"【空きあり】{month_label}: {len(slots)} 件")
+        lines.append("  " + ", ".join(slots[:30]))
     else:
-        results.append(f"【満席】{month_label}: 予約可能な日程なし")
-    results.append(f"  スクリーンショット: {screenshot_path}")
+        lines.append(f"【満席】{month_label}: 予約可能な日程なし")
+    lines.append(f"  スクリーンショット: {screenshot_path}")
 
-    return {"year": year, "month": month, "screenshot": screenshot_path, "slots": slots}
+    return {"year": year, "month": month, "screenshot": screenshot_path, "slots": slots, "lines": lines}
 
 
 async def check_availability():
@@ -424,7 +432,6 @@ async def check_availability():
             available_months = []  # LINE通知用の空き情報
 
             # ── STEP 1: サイトが表示しているデフォルト月を確認 ──
-            results.append("")
             site_info = await check_calendar(page, "site_default", results, date_str)
             site_year = site_info["year"]
             site_month = site_info["month"]
@@ -436,12 +443,11 @@ async def check_availability():
             # サイトが「翌月」を表示している場合、前月 = 実際の今月（まだ日程が残っている）
             prev_month = site_month - 1 if site_month and site_month > 1 else 12
             prev_year = site_year if site_month and site_month > 1 else (site_year - 1 if site_year else None)
+            prev_info = None
 
             if prev_year == now.year and prev_month == now.month:
                 prev_clicked = await try_click_month(page, prev_month, results)
                 if prev_clicked:
-                    results.append("")
-                    results.append(f"--- {prev_year}年{prev_month}月（今月） ---")
                     prev_info = await check_calendar(page, "prev_month", results, date_str)
                     ordered_screenshots.append(prev_info["screenshot"])  # 当月を先頭に
                     if prev_info["slots"]:
@@ -455,6 +461,8 @@ async def check_availability():
             ordered_screenshots.append(site_screenshot)  # サイトデフォルト月
 
             # ── STEP 3: 翌月を確認（サイト表示月の10日18:00以降に解禁） ──
+            next_info = None
+            next_month = next_year = None
             if site_year and site_month:
                 site_month_10th = datetime(site_year, site_month, 10, 18, 0)
                 if now >= site_month_10th:
@@ -462,14 +470,24 @@ async def check_availability():
                     next_year = site_year if site_month < 12 else site_year + 1
                     next_clicked = await try_click_month(page, next_month, results, silent=True)
                     if next_clicked:
-                        results.append("")
-                        results.append(f"--- {next_year}年{next_month}月（翌月・解禁済み） ---")
                         next_info = await check_calendar(page, "next_month", results, date_str)
                         ordered_screenshots.append(next_info["screenshot"])
                         if next_info["slots"]:
                             available_months.append((f"{next_year}年{next_month}月", next_info["slots"]))
                     else:
                         results.append(f"\n△ 翌月（{next_month}月）ボタンが見つかりませんでした")
+
+            # ── 月別結果を当月→翌月の順で出力 ──
+            if prev_info:
+                results.append("")
+                results.append(f"--- {prev_year}年{prev_month}月（今月） ---")
+                results.extend(prev_info["lines"])
+            results.append("")
+            results.extend(site_info["lines"])
+            if next_info:
+                results.append("")
+                results.append(f"--- {next_year}年{next_month}月（翌月・解禁済み） ---")
+                results.extend(next_info["lines"])
 
             # ── 結合画像を出力 ──
             if len(ordered_screenshots) >= 2:
