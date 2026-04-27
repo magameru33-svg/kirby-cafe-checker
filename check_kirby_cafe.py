@@ -276,14 +276,23 @@ def slot_sort_key(slot: str) -> tuple:
     return (int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)))
 
 
-async def check_calendar(page, label, results, date_str):
+def is_future_slot(slot: str, year: int, now: datetime) -> bool:
+    m = re.match(r'(\d+)/(\d+)[（(][月火水木金土日][）)](\d+):(\d+)', slot)
+    if not m:
+        return True
+    slot_dt = datetime(year, int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)))
+    return slot_dt > now
+
+
+async def check_calendar(page, label, results, date_str, now=None):
     """現在表示中のカレンダーの空き状況を取得して結果に追記する"""
     await page.wait_for_timeout(2000)
     data = await page.evaluate(JS_GET_AVAILABILITY)
     year = data.get("year")
     month = data.get("month")
     month_label = f"{year}年{month}月" if year and month else label
-    slots = sorted(data.get("available", []), key=slot_sort_key)
+    raw_slots = sorted(data.get("available", []), key=slot_sort_key)
+    slots = [s for s in raw_slots if now is None or is_future_slot(s, year or now.year, now)]
 
     # スクロール可能な内部コンテナのoverflow制限を解除してから撮影
     await page.evaluate("""
@@ -432,7 +441,7 @@ async def check_availability():
             available_months = []  # LINE通知用の空き情報
 
             # ── STEP 1: サイトが表示しているデフォルト月を確認 ──
-            site_info = await check_calendar(page, "site_default", results, date_str)
+            site_info = await check_calendar(page, "site_default", results, date_str, now=now)
             site_year = site_info["year"]
             site_month = site_info["month"]
             site_screenshot = site_info["screenshot"]
@@ -448,7 +457,7 @@ async def check_availability():
             if prev_year == now.year and prev_month == now.month:
                 prev_clicked = await try_click_month(page, prev_month, results)
                 if prev_clicked:
-                    prev_info = await check_calendar(page, "prev_month", results, date_str)
+                    prev_info = await check_calendar(page, "prev_month", results, date_str, now=now)
                     ordered_screenshots.append(prev_info["screenshot"])  # 当月を先頭に
                     if prev_info["slots"]:
                         available_months.insert(0, (f"{prev_year}年{prev_month}月", prev_info["slots"]))
@@ -470,7 +479,7 @@ async def check_availability():
                     next_year = site_year if site_month < 12 else site_year + 1
                     next_clicked = await try_click_month(page, next_month, results, silent=True)
                     if next_clicked:
-                        next_info = await check_calendar(page, "next_month", results, date_str)
+                        next_info = await check_calendar(page, "next_month", results, date_str, now=now)
                         ordered_screenshots.append(next_info["screenshot"])
                         if next_info["slots"]:
                             available_months.append((f"{next_year}年{next_month}月", next_info["slots"]))
