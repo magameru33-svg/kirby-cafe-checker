@@ -2,10 +2,8 @@ name: Kirby Cafe Availability Check
 
 on:
   schedule:
-    # JST = UTC+9 なので UTC で指定
-    - cron: '15 9 * * *'   # JST 18:15
-    - cron: '30 9 * * *'   # JST 18:30
-    - cron: '0 1 * * *'    # JST 10:00 (毎日の通常チェック)
+    # JST 09:00-22:00 を10分おき (UTC 00:00-13:00)
+    - cron: '*/10 0-13 * * *'
   workflow_dispatch:        # 手動実行も可能
 
 jobs:
