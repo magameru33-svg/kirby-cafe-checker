@@ -353,17 +353,35 @@ async def check_availability():
         cdp = await context.new_cdp_session(page)
         await cdp.send("Network.setCacheDisabled", {"cacheDisabled": True})
 
-        # リクエストヘッダーにno-cacheを強制付与
+        bust = int(now.timestamp())
+
+        # 全GETリクエストにキャッシュバスティング + no-cacheヘッダーを付与
         async def disable_cache(route):
-            await route.continue_(headers={
+            url = route.request.url
+            headers = {
                 **route.request.headers,
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Pragma": "no-cache",
-            })
+            }
+            if route.request.method == "GET" and "kirbycafe-reserve.com" in url:
+                sep = "&" if "?" in url else "?"
+                url = f"{url}{sep}_={bust}"
+            await route.continue_(url=url, headers=headers)
         await page.route("**/*", disable_cache)
 
+        # レスポンスのキャッシュ状態を診断ログに記録
+        async def log_cache_headers(response):
+            if "kirbycafe-reserve.com" in response.url:
+                info = {}
+                for key in ["age", "x-cache", "cf-cache-status", "x-amz-cf-pop", "cache-control"]:
+                    val = response.headers.get(key)
+                    if val:
+                        info[key] = val
+                if info:
+                    results.append(f"[cache診断] {response.url[-70:]}: {info}")
+        page.on("response", log_cache_headers)
+
         try:
-            bust = int(now.timestamp())
             await page.goto(f"{URL}?_={bust}", wait_until="networkidle", timeout=30000)
             await page.wait_for_timeout(2000)
 
