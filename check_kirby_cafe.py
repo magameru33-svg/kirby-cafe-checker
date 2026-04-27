@@ -356,9 +356,14 @@ async def check_availability():
             locale="ja-JP",
         )
         page = await context.new_page()
+        await page.set_extra_http_headers({
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+        })
 
         try:
-            await page.goto(URL, wait_until="networkidle", timeout=30000)
+            cache_bust = f"{URL}?t={int(now.timestamp())}"
+            await page.goto(cache_bust, wait_until="networkidle", timeout=30000)
             await page.wait_for_timeout(2000)
 
             # 冒頭モーダルの「OK」を閉じる
