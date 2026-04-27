@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where python *)",
+      "Bash(python check_kirby_cafe.py)",
+      "Bash(schtasks *)",
+      "PowerShell(schtasks *)",
+      "PowerShell(Get-ScheduledTask *)",
+      "PowerShell(powercfg *)"
+    ]
+  }
+}
