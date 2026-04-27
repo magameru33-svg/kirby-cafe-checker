@@ -20,11 +20,12 @@ from playwright.async_api import async_playwright
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-# スケジュールタスク（SYSTEMアカウント）でも正しいブラウザパスを参照させる
-os.environ.setdefault(
-    "PLAYWRIGHT_BROWSERS_PATH",
-    r"C:\Users\mitsu\AppData\Local\ms-playwright",
-)
+# スケジュールタスク（SYSTEMアカウント）でも正しいブラウザパスを参照させる（Windows のみ）
+if sys.platform == "win32":
+    os.environ.setdefault(
+        "PLAYWRIGHT_BROWSERS_PATH",
+        r"C:\Users\mitsu\AppData\Local\ms-playwright",
+    )
 
 URL = "https://kirbycafe-reserve.com/guest/tokyo/reserve/"
 PARTY_SIZE = 4
