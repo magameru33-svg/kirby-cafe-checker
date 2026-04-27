@@ -13,7 +13,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from datetime import date, datetime, time as dtime
+from datetime import date, datetime, time as dtime, timezone, timedelta
 from PIL import Image
 import jpholiday
 from playwright.async_api import async_playwright
@@ -316,7 +316,7 @@ async def check_calendar(page, label, results, date_str):
 
 
 async def check_availability():
-    now = datetime.now()
+    now = datetime.now(timezone(timedelta(hours=9))).replace(tzinfo=None)
     date_str = now.strftime("%Y-%m-%d_%H-%M")   # 例: 2026-04-26_20-15
     today_str = now.strftime("%Y-%m-%d")
     now_str = now.strftime("%Y-%m-%d %H:%M:%S")
