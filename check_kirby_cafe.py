@@ -356,14 +356,22 @@ async def check_availability():
             locale="ja-JP",
         )
         page = await context.new_page()
-        await page.set_extra_http_headers({
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-        })
+
+        # CDPでブラウザキャッシュを完全無効化
+        cdp = await context.new_cdp_session(page)
+        await cdp.send("Network.setCacheDisabled", {"cacheDisabled": True})
+
+        # リクエストヘッダーにno-cacheを強制付与
+        async def disable_cache(route):
+            await route.continue_(headers={
+                **route.request.headers,
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+            })
+        await page.route("**/*", disable_cache)
 
         try:
             await page.goto(URL, wait_until="networkidle", timeout=30000)
-            await page.reload(wait_until="networkidle", timeout=30000)
             await page.wait_for_timeout(2000)
 
             # 冒頭モーダルの「OK」を閉じる
