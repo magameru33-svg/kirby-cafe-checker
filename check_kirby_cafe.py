@@ -362,8 +362,8 @@ async def check_availability():
         })
 
         try:
-            cache_bust = f"{URL}?t={int(now.timestamp())}"
-            await page.goto(cache_bust, wait_until="networkidle", timeout=30000)
+            await page.goto(URL, wait_until="networkidle", timeout=30000)
+            await page.reload(wait_until="networkidle", timeout=30000)
             await page.wait_for_timeout(2000)
 
             # 冒頭モーダルの「OK」を閉じる
