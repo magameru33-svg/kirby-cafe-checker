@@ -1,8 +1,0 @@
-=== カービィカフェ東京 空き状況チェック (2026-04-27 16:38:43) ===
-対象: 4名 / URL: https://kirbycafe-reserve.com/guest/tokyo/reserve/
-
-[エラー] Page.goto: net::ERR_INTERNET_DISCONNECTED at https://kirbycafe-reserve.com/guest/tokyo/reserve/
-Call log:
-  - navigating to "https://kirbycafe-reserve.com/guest/tokyo/reserve/", waiting until "networkidle"
-
-
