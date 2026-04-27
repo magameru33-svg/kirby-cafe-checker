@@ -1,0 +1,39 @@
+name: Kirby Cafe Check
+
+on:
+  schedule:
+    - cron: '*/10 0-13 * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install playwright pillow jpholiday
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Run checker
+        env:
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+        run: python check_kirby_cafe.py
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kirby-results-${{ github.run_id }}
+          path: |
+            *.txt
+            *.png
+          retention-days: 7
